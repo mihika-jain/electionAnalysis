@@ -4,6 +4,26 @@ import math
 from typing import Optional
 from sklearn.model_selection import train_test_split
 
+
+def extract_ranked_num_and_cat_columns(dictionary):
+    # Initialize lists to store the columns
+    ranked_columns = []
+    num_columns = []
+    cat_columns = []
+
+    # Iterate over the dictionary and categorize columns
+    for var, info in dictionary.items():
+        # Check the type of each column
+        if info['type'] == 'rank':
+            ranked_columns.append(info['column'])
+        elif info['type'] == 'num':
+            num_columns.append(info['column'])
+        elif info['type'] == 'cat':
+            cat_columns.append(info['column'])
+
+    return ranked_columns, num_columns, cat_columns
+
+
 def num_unique_cols(data: pd.DataFrame, cols: str, num_unique) -> pd.DataFrame:
     "Changes all values above the number of unique items that should be in the columns to NAN"
     data = data.copy(deep=True)
@@ -24,19 +44,40 @@ def num_unique_cols(data: pd.DataFrame, cols: str, num_unique) -> pd.DataFrame:
 
     return data
 
-def invalid_to_nan(data: pd.DataFrame, cols: str, invalid_values: list) -> pd.DataFrame:
-    "Changes invalid values to NAN"
-    data = data.copy(deep=True)
-    for c in cols:
-        data[c] = data[c].replace(invalid_values, np.nan)
-    return data
 
-def categories_oneHot(data: pd.DataFrame, cols: list, drop_first: bool, mappings: dict) -> pd.DataFrame:
-    "one hot encodes the columns listed"
-    data = data.copy()
-    for c in cols:
-        data[c] = data[c].map(mappings)
-    data = pd.get_dummies(data, columns=cols, drop_first=drop_first)
+def clean_columns(data, column_dict):
+    """
+    This function cleans columns in a DataFrame based on a dictionary with column names and properties.
+    It handles 'rank' and 'num' columns by replacing out-of-bound values with NaN and 'cat' columns
+    by aligning their categories to form a continuous sequence.
+    
+    :param data: DataFrame containing the data.
+    :param column_dict: Dictionary containing column names and their properties.
+    :return: Cleaned DataFrame.
+    """
+    
+    # Iterate over each column in the dictionary
+    for colV, info in column_dict.items():
+        # Check if the column exists in the DataFrame
+        col = info['column']
+        if col in data.columns:
+            max_value = info['unique_values']
+                
+            # Replace values greater than max_value or less than 0 with NaN
+            data[col] = data[col].apply(lambda x: np.nan if x < 0 or x > max_value else x)
+            
+            if info['type'] == 'cat':
+                # Convert to category if not already
+                data[col] = data[col].astype('category')
+                # Check if the category starts at 1, if not, shift to start from 0
+                categories = data[col].cat.categories
+                
+                if categories.min() != 0:
+                    data[col] = data[col].cat.set_categories(range(len(categories)), ordered=True)
+                
+        else:
+            print(f"Column '{col}' not found in DataFrame.")
+    
     return data
 
 
