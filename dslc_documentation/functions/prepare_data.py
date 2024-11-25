@@ -49,8 +49,9 @@ def clean_columns(data, column_dict):
         col_type = info.get('type')
         max_value = info.get('unique_values')
         
-        if col_name not in data.columns:
-            print(f"Column '{col_name}' not found in DataFrame.")
+        if col_name not in data.columns or col_name == 'weights':
+            if col_name not in data.columns:
+                print(f"Column '{col_name}' not found in DataFrame.")
             continue
         
         # Replace values out of bounds (less than 0 or greater than max_value) with NaN
