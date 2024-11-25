@@ -189,7 +189,7 @@ def one_hot_cat_cols(data, column_dict, label_dict):
         # Check if the column is categorical
         if col_type == 'cat' and col_name in data.columns:
             # Perform one-hot encoding
-            one_hot = pd.get_dummies(data[col_name], prefix=col_name)
+            one_hot = pd.get_dummies(data[col_name], prefix=col_name, drop_first=True)
             
             # Rename columns using the label mapping, if provided
             label_map = label_dict.get(col_key)['labels']
