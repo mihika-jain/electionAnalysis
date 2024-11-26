@@ -6,6 +6,7 @@ def perturb_dataframe(df, perturb_frac=0.3, random_state=None):
     Perturbs a DataFrame:
     - Numerical columns: Adds random noise between ±0.5 times the column's standard deviation to a fraction of rows.
     - Categorical columns: Randomly replaces a fraction of values with another value from the same column.
+    - One-hot encoded columns (True/False): Randomly flips a False to True while ensuring only one True per row.
     
     Parameters:
         df (pd.DataFrame): The input DataFrame.
@@ -46,5 +47,13 @@ def perturb_dataframe(df, perturb_frac=0.3, random_state=None):
         
         # Replace the selected rows with the random values
         df_perturbed.loc[perturb_indices, col] = replacements
-
+    
+    # Perturb one-hot encoded columns (True/False)
+    for col in df.select_dtypes(include=['bool']).columns:  # Check for boolean columns
+        # Select a subset of rows to perturb
+        perturb_indices = df.sample(frac=perturb_frac, random_state=random_state).index
+        
+        # Randomly flip a False to True, ensuring only one True per row for one-hot columns
+        df_perturbed.loc[perturb_indices, col] = ~df_perturbed.loc[perturb_indices, col]  # Flips True to False and vice versa
+    
     return df_perturbed
