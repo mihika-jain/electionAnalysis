@@ -73,18 +73,19 @@ def clean_columns(data, column_dict):
     return data
 
 
-def knn_impute(data, column_dict, n_neighbors=5):
+def knn_impute(data, column_dict, label_dict, n_neighbors=5):
     """
     Imputes missing values in a DataFrame using KNN imputation and cleans the data
-    according to the specifications in the provided dictionary.
+    according to the specifications in the provided dictionaries.
     
     :param data: DataFrame containing the data with missing values.
     :param column_dict: Dictionary specifying column properties (type, unique values, etc.).
+    :param label_dict: Dictionary containing label mappings for categorical columns.
     :param n_neighbors: Number of neighbors to consider for KNN imputation.
     :return: Cleaned and imputed DataFrame.
     """
-    # Initialize the KNNImputer with a specified number of neighbors (e.g., 5)
-    KNN_imputer = KNNImputer(n_neighbors=5)
+    # Initialize the KNNImputer with a specified number of neighbors
+    KNN_imputer = KNNImputer(n_neighbors=n_neighbors)
 
     # Fit the imputer to the data and transform it
     df_imputed = pd.DataFrame(KNN_imputer.fit_transform(data), columns=data.columns)
@@ -93,22 +94,34 @@ def knn_impute(data, column_dict, n_neighbors=5):
     for col_id, info in column_dict.items():
         col_name = info['column']
         col_type = info['type']
-        unique_vals = info['unique_values']
-        
-        if col_type in ['cat', 'rank']:
-            # Round to nearest integer
+
+        if col_type == 'cat':
+            # Round to the nearest integer
             df_imputed[col_name] = np.round(df_imputed[col_name])
             
-            # Ensure values don't exceed the specified unique values
-            df_imputed[col_name] = df_imputed[col_name].clip(0, unique_vals)
+            # Map to the nearest valid label using the label dictionary
+            if col_id in label_dict:
+                valid_labels = np.array(list(label_dict[col_id]['labels'].keys()))
+                df_imputed[col_name] = df_imputed[col_name].apply(
+                    lambda x: valid_labels[np.abs(valid_labels - x).argmin()]
+                )
             
+            # Ensure the column remains as integers
             df_imputed[col_name] = df_imputed[col_name].astype(int)
-        
+
+        elif col_type == 'rank':
+            # Round to the nearest integer and clip to the specified range
+            unique_vals = info['unique_values']
+            df_imputed[col_name] = np.round(df_imputed[col_name])
+            df_imputed[col_name] = df_imputed[col_name].clip(0, unique_vals)
+            df_imputed[col_name] = df_imputed[col_name].astype(int)
+
         elif col_type == 'num':
             # For numerical variables, round to 2 decimal places
             df_imputed[col_name] = df_imputed[col_name].round(2)
     
     return df_imputed
+
 
 
 def combine_columns_by_group(data, 

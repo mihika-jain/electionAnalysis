@@ -1,0 +1,15 @@
+,column,unique_values,type
+VCF0004,Year,9223372036854775807,num
+VCF0104,Sex,2,cat
+VCF0302,PartyID,5,cat
+VCF0656,GovTrust,100,rank
+VCF0870,EconomyView,5,rank
+VCF0838,AbortionRightsSC,4,cat
+VCF0101,Age,96,num
+VCF0110,EducationLevel,4,cat
+VCF0114,Income,5,cat
+VCF0105a,Race,6,cat
+VCF0112,Region,4,cat
+VCF0806,ScaleMedInsurance,7,rank
+VCF0702,Voted,2,cat
+VCF0704,VotePresident,2,cat
