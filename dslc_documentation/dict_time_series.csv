@@ -1,12 +1,14 @@
 ,column,unique_values,type
+VCF0888,incCrimeFedSpending,3,rank
+VCF0310,interestInElection,3,rank
 VCF0713,PRE_IntentVote,4,cat
 VCF0004,Year,9223372036854775807,num
 VCF0104,Sex,2,cat
-VCF0302,PartyID,5,cat
+VCF0301,PartyID,7,rank
 VCF0839,ScaleSpendingServices,7,rank
 VCF0130,religiousAttendence,5,rank
 VCF0656,GovTrust,100,rank
-VCF0870,EconomyView,5,rank
+VCF0871,EconomyView,5,rank
 VCF0838,AbortionRightsSC,4,cat
 VCF0101,Age,96,num
 VCF0110,EducationLevel,4,cat
@@ -16,6 +18,9 @@ VCF0112,Region,4,cat
 VCF0843,ScaleDefenseSpending,7,rank
 VCF0806,ScaleMedInsurance,7,rank
 VCF0834,WomenRights,7,rank
-VCF0703,RegistrationStatus,3,cat
+VCF0703,RegistrationStatus,2,cat
 VCF0702,Voted,2,cat
 VCF0704a,VotePresident,2,cat
+VCF0127,HH_In_Union,2,cat
+VCF0147,MaritalStatus,7,cat
+VCF0606,FedWasteTaxes,3,rank
