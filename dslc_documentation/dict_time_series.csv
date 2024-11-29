@@ -24,3 +24,4 @@ VCF0704a,VotePresident,2,cat
 VCF0127,HH_In_Union,2,cat
 VCF0147,MaritalStatus,7,cat
 VCF0606,FedWasteTaxes,3,rank
+VCF0853,TraditionalValues,5,rank

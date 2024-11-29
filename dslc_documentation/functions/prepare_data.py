@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+import ast
 
 
 def extract_ranked_num_and_cat_columns(dictionary):
@@ -43,6 +44,7 @@ def clean_columns(data, column_dict):
     :return: Cleaned DataFrame.
     """
     data = data.copy(deep=True)  # Create a deep copy to avoid modifying the original DataFrame.
+    data = data.apply(pd.to_numeric, errors='coerce')
     
     for col_key, info in column_dict.items():
         col_name = info.get('column')
@@ -53,23 +55,16 @@ def clean_columns(data, column_dict):
             if col_name not in data.columns:
                 print(f"Column '{col_name}' not found in DataFrame.")
             continue
-        
+            
+        if col_name == 'RegistrationStatus':
+            data[col_name] = data[col_name].replace(3, 2)
+            data[col_name] = data[col_name].replace(0, np.nan)
+            
         # Replace values out of bounds (less than 0 or greater than max_value) with NaN
         data[col_name] = data[col_name].apply(
             lambda x: np.nan if (pd.notna(x) and (x < 0 or x > max_value)) else x
         )
-        
-        '''# Handle 'cat' type columns
-        if col_type == 'cat':
-            if not pd.api.types.is_categorical_dtype(data[col_name]):
-                data[col_name] = data[col_name].astype('category')
-            
-            # Adjust categories to start from 0 if needed
-            categories = data[col_name].cat.categories
-            if len(categories) > 0 and categories.min() != 0:
-                shifted_categories = categories - categories.min()
-                data[col_name] = data[col_name].cat.rename_categories(shifted_categories)'''
-    
+
     return data
 
 
@@ -122,6 +117,168 @@ def knn_impute(data, column_dict, label_dict, n_neighbors=5):
     
     return df_imputed
 
+
+def drop_rows_before_year(df, year_column, cutoff_year):
+    """
+    Drop all rows where the year is lower than the specified cutoff year.
+
+    Parameters:
+        df (pd.DataFrame): The DataFrame to modify.
+        year_column (str): The column name representing the year.
+        cutoff_year (int): The cutoff year; rows with years below this value will be dropped.
+
+    Returns:
+        pd.DataFrame: A new DataFrame with the rows removed.
+    """
+    if year_column not in df.columns:
+        raise ValueError(f"Year column '{year_column}' not found in DataFrame.")
+    
+    return df[df[year_column] >= cutoff_year]
+
+def drop_high_missing_columns(df, missing_threshold=0.5):
+    """
+    Drops columns with a proportion of missing values exceeding the specified threshold.
+
+    Parameters:
+    - df (pd.DataFrame): The input DataFrame to process.
+    - missing_threshold (float): The proportion of missing values allowed per column (default is 0.5).
+
+    Returns:
+    - pd.DataFrame: The DataFrame with columns dropped.
+    - list: A list of column names that were dropped.
+    """
+    # Calculate the threshold for allowed missing values
+    threshold = len(df) * missing_threshold
+
+    # Get the initial columns
+    original_columns = set(df.columns)
+
+    # Drop columns with more missing values than the threshold
+    df_dropped = df.dropna(axis=1, thresh=threshold)
+
+    # Get the dropped columns
+    dropped_columns = list(original_columns - set(df_dropped.columns))
+
+    return df_dropped, dropped_columns
+
+
+def remove_keys_from_dict(dictionary, key_list, column_key='column'):
+    """
+    Safely removes keys from a dictionary based on a condition.
+    
+    Parameters:
+    - dictionary (dict): The dictionary to modify.
+    - key_list (list): List of values to match for removal.
+    - column_key (str): The key to look up inside the dictionary values for comparison.
+    
+    Returns:
+    - dict: The updated dictionary with specified keys removed.
+    """
+    # Iterate over a list of keys to avoid modifying during iteration
+    for key in list(dictionary.keys()):
+        if dictionary[key][column_key] in key_list:
+            #print(dictionary[key][column_key])
+            del dictionary[key]
+    return dictionary
+
+
+
+def add_swing_voter_column_timeSeries(df, column_labels_time):
+    """
+    Add a column `swing_voter` to the DataFrame based on the criteria:
+    - If `PRE_IntentVote` is 3 or 4, `swing_voter` is True.
+    - If `PRE_IntentVote` is 1 or 2 and `VotePresident` flips, `swing_voter` is True.
+    - Otherwise, `swing_voter` is False.
+
+    Parameters:
+        df (pd.DataFrame): The input DataFrame.
+        column_labels_time (dict): A dictionary defining columns and their labels.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the new `swing_voter` column.
+    """
+    # Extract column names from the dictionary
+    pre_intent_vote_col = column_labels_time["VCF0713"]["column"]  # "PRE_IntentVote"
+    vote_president_col = "VotePresident"  # Assuming this column exists in the DataFrame
+
+    # Ensure required columns exist in the DataFrame
+    required_columns = [pre_intent_vote_col, vote_president_col]
+    for col in required_columns:
+        if col not in df.columns:
+            raise ValueError(f"Required column '{col}' not found in DataFrame.")
+
+    def is_swing_voter(row):
+        """
+        Determine if a row qualifies as a swing voter based on the criteria.
+        """
+        pre_vote = row[pre_intent_vote_col]
+        vote_president = row[vote_president_col]
+
+        # If PRE_IntentVote is 3 or 4
+        if pre_vote in [3, 4]:
+            return True
+
+        # If PRE_IntentVote is 1 or 2 and VotePresident flips
+        if pre_vote in [1, 2] and pre_vote != vote_president:
+            return True
+
+        # Otherwise, not a swing voter
+        return False
+
+    # Apply the function to each row to create the new column
+    df["swing_voter"] = df.apply(is_swing_voter, axis=1)
+
+    return df
+
+
+def knn_impute_nonDict(data, column_dict, label_dict, n_neighbors=5):
+    """
+    Imputes missing values in a DataFrame using KNN imputation and cleans the data
+    according to the specifications in the provided dictionaries.
+    
+    :param data: DataFrame containing the data with missing values.
+    :param column_dict: DF specifying column properties (type, unique values, etc.).
+    :param label_dict: DF containing label mappings for categorical columns.
+    :param n_neighbors: Number of neighbors to consider for KNN imputation.
+    :return: Cleaned and imputed DataFrame.
+    """
+    # Initialize the KNNImputer with a specified number of neighbors
+    KNN_imputer = KNNImputer(n_neighbors=n_neighbors)
+
+    # Fit the imputer to the data and transform it
+    df_imputed = pd.DataFrame(KNN_imputer.fit_transform(data), columns=data.columns)
+ 
+    # Post-process imputed values based on column type
+    for col_id in column_dict.index:
+        col_name = column_dict.loc[col_id]['column']
+        col_type = column_dict.loc[col_id]['type']
+
+        if col_type == 'cat':
+            # Round to the nearest integer
+            df_imputed[col_name] = np.round(df_imputed[col_name])
+            
+            # Map to the nearest valid label using the label dictionary
+            if col_id in label_dict.index:
+                valid_labels = np.array(list(ast.literal_eval(label_dict.iloc[0]['labels']).keys()))
+                df_imputed[col_name] = df_imputed[col_name].apply(
+                    lambda x: valid_labels[np.abs(valid_labels - x).argmin()]
+                )
+            
+            # Ensure the column remains as integers
+            df_imputed[col_name] = df_imputed[col_name].astype(int)
+
+        elif col_type == 'rank':
+            # Round to the nearest integer and clip to the specified range
+            unique_vals = column_dict.loc[col_id]['unique_values']
+            df_imputed[col_name] = np.round(df_imputed[col_name])
+            df_imputed[col_name] = df_imputed[col_name].clip(0, unique_vals)
+            df_imputed[col_name] = df_imputed[col_name].astype(int)
+
+        elif col_type == 'num':
+            # For numerical variables, round to 2 decimal places
+            df_imputed[col_name] = df_imputed[col_name].round(2)
+    
+    return df_imputed
 
 
 def combine_columns_by_group(data, 

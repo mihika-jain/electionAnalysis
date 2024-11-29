@@ -1,5 +1,74 @@
 import pandas as pd
 import numpy as np
+import importlib
+import sys
+import os
+
+def perturb_dataframe_assumptions(path, drop_columns, n_neighborhoods, transform_data, cor_feature_selection_threshold, convert_categorical, year_threshold):
+    
+    # Add the directory containing the file to the Python path
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(path), 'functions')))
+    # Import the function
+    from functions import load_data
+    from functions import prepare_data
+    from functions import  load_dictionaries_time_series
+    # Reload the module to reflect any updates
+    importlib.reload(load_data)
+    importlib.reload(prepare_data)
+    importlib.reload(load_dictionaries_time_series)
+    
+    dictionary = load_dictionaries_time_series.dict_time_series()
+    column_labels = load_dictionaries_time_series.column_labels_time()
+    
+    df = load_data.load_data(path, dictionary)
+    df = prepare_data.clean_columns(df, dictionary)
+    
+    year_column = dictionary["VCF0004"]["column"]
+    cutoff_year = year_threshold
+    df = prepare_data.drop_rows_before_year(df, year_column, cutoff_year)
+    
+    df = prepare_data.knn_impute(df, dictionary, column_labels, n_neighborhoods)
+    df = prepard_data.add_swing_voter_column_timeSeries(df, column_labels_time)
+    
+    df = df.drop(columns = drop_columns)
+    dict_time_series = prepare_data.remove_keys_from_dict(dictionary, drop_columns)
+    
+    
+    if convert_categorical == 'dummy':
+        df = prepare_data.one_hot_cat_cols(df, dictionary, column_labels)
+    
+    if transform_data =="standard":
+        from sklearn.preprocessing import StandardScaler
+
+        # Standardizing the data before PCA
+        scaler = StandardScaler()
+        df = scaler.fit_transform(df)
+        
+    elif transform_data =="minMax":
+        from sklearn.preprocessing import MinMaxScaler
+
+        # Standardizing the data before PCA
+        scaler = MinMaxScaler()
+        df = scaler.fit_transform(df)
+    
+    #----------------------- Correlation feature selection ---------------------#
+    # select only features that are at least 0.5 correlated with response
+    if (cor_feature_selection_threshold != None):
+        # compute pairwise correlations
+        cor_swing = df.corr().drop(index=["swing_voter"])
+        # extract sale price correlations
+        cor_swing = cor_saleprice["swing_voter"]
+
+        # identify variables whose corr with sale price is above the threshold
+        high_cor_vars = cor_saleprice[(np.abs(cor_swing) >= cor_feature_selection_threshold)].index
+        high_cor_vars = list(high_cor_vars)
+        high_cor_vars.extend(["swing_voter"])
+        # filter to just the highly correlated vars
+        df = df[high_cor_vars]
+        
+    train_time_data, val_time_data, test_time_data = prepare_data.split_data(df)
+    return train_time_data, val_time_data
+    
 
 def perturb_dataframe(df, perturb_frac=0.3, random_state=None):
     """
