@@ -3,71 +3,65 @@ import numpy as np
 import importlib
 import sys
 import os
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
+from functions import prepare_data
+importlib.reload(prepare_data)
 
-def perturb_dataframe_assumptions(path, drop_columns, n_neighborhoods, transform_data, cor_feature_selection_threshold, convert_categorical, year_threshold):
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import pandas as pd
+import numpy as np
+
+def perturb_dataframe_assumptions(df_dict, dictionary, column_labels, drop_columns, n_neighborhoods, transform_data, cor_feature_selection_threshold, convert_categorical, year_threshold):
     
-    # Add the directory containing the file to the Python path
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(path), 'functions')))
-    # Import the function
-    from functions import load_data
-    from functions import prepare_data
-    from functions import  load_dictionaries_time_series
-    # Reload the module to reflect any updates
-    importlib.reload(load_data)
-    importlib.reload(prepare_data)
-    importlib.reload(load_dictionaries_time_series)
-    
-    dictionary = load_dictionaries_time_series.dict_time_series()
-    column_labels = load_dictionaries_time_series.column_labels_time()
-    
-    df = load_data.load_data(path, dictionary)
-    df = prepare_data.clean_columns(df, dictionary)
+    df = df_dict[n_neighborhoods]
     
     year_column = dictionary["VCF0004"]["column"]
     cutoff_year = year_threshold
     df = prepare_data.drop_rows_before_year(df, year_column, cutoff_year)
     
-    df = prepare_data.knn_impute(df, dictionary, column_labels, n_neighborhoods)
-    df = prepard_data.add_swing_voter_column_timeSeries(df, column_labels_time)
+    df = prepare_data.add_swing_voter_column_timeSeries(df, column_labels)
+    df = df.drop(columns=drop_columns)
     
-    df = df.drop(columns = drop_columns)
-    dict_time_series = prepare_data.remove_keys_from_dict(dictionary, drop_columns)
-    
+    dictionary_final = prepare_data.remove_keys_from_dict(dictionary, drop_columns)
+    column_labels_final = prepare_data.remove_keys_from_dict(column_labels, drop_columns)
     
     if convert_categorical == 'dummy':
-        df = prepare_data.one_hot_cat_cols(df, dictionary, column_labels)
+        df = prepare_data.one_hot_cat_cols(df, dictionary_final, column_labels_final)
     
-    if transform_data =="standard":
-        from sklearn.preprocessing import StandardScaler
-
-        # Standardizing the data before PCA
+    if transform_data == "standard":
+        numerical_features = [dictionary_final[col]["column"] for col in dictionary_final.keys()
+                              if dictionary_final[col]["type"] == "rank" or dictionary_final[col]["type"] == "num"]
         scaler = StandardScaler()
-        df = scaler.fit_transform(df)
-        
-    elif transform_data =="minMax":
-        from sklearn.preprocessing import MinMaxScaler
-
-        # Standardizing the data before PCA
-        scaler = MinMaxScaler()
-        df = scaler.fit_transform(df)
+        df[numerical_features] = scaler.fit_transform(df[numerical_features])
+        df = pd.DataFrame(df, columns=df.columns)  # Restore DataFrame structure
     
-    #----------------------- Correlation feature selection ---------------------#
-    # select only features that are at least 0.5 correlated with response
-    if (cor_feature_selection_threshold != None):
-        # compute pairwise correlations
-        cor_swing = df.corr().drop(index=["swing_voter"])
-        # extract sale price correlations
-        cor_swing = cor_saleprice["swing_voter"]
-
-        # identify variables whose corr with sale price is above the threshold
-        high_cor_vars = cor_saleprice[(np.abs(cor_swing) >= cor_feature_selection_threshold)].index
-        high_cor_vars = list(high_cor_vars)
-        high_cor_vars.extend(["swing_voter"])
-        # filter to just the highly correlated vars
-        df = df[high_cor_vars]
+    # Correlation feature selection - Remove one column of each highly correlated pair
+    if cor_feature_selection_threshold != 0:
+        # Calculate the correlation matrix
+        cor_matrix = df.corr()
         
+        # Set the diagonal to NaN to avoid selecting the same column pair
+        np.fill_diagonal(cor_matrix.values, np.nan)
+        
+        # Identify highly correlated pairs
+        correlated_pairs = cor_matrix.stack().loc[lambda x: abs(x) >= cor_feature_selection_threshold]
+        
+        # Initialize a list to keep track of columns to drop
+        columns_to_drop = set()
+
+        # Iterate over the correlated pairs and mark one of the columns for removal
+        for (col1, col2), cor_value in correlated_pairs.items():
+            if col1 != 'swing_voter' and col2 != 'swing_voter':  # Don't drop swing_voter
+                # Add the first column of the pair to the drop list
+                columns_to_drop.add(col2)  # You can drop col1 instead if preferred
+
+        # Drop the selected columns from the dataframe
+        df = df.drop(columns=columns_to_drop)
+    
     train_time_data, val_time_data, test_time_data = prepare_data.split_data(df)
     return train_time_data, val_time_data
+
     
 
 def perturb_dataframe(df, perturb_frac=0.3, random_state=None):

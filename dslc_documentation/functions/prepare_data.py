@@ -175,11 +175,12 @@ def remove_keys_from_dict(dictionary, key_list, column_key='column'):
     - dict: The updated dictionary with specified keys removed.
     """
     # Iterate over a list of keys to avoid modifying during iteration
+    dict_ = {}
     for key in list(dictionary.keys()):
-        if dictionary[key][column_key] in key_list:
+        if dictionary[key][column_key] not in key_list:
             #print(dictionary[key][column_key])
-            del dictionary[key]
-    return dictionary
+            dict_[key] = dictionary[key]
+    return dict_
 
 
 
@@ -227,6 +228,34 @@ def add_swing_voter_column_timeSeries(df, column_labels_time):
 
     # Apply the function to each row to create the new column
     df["swing_voter"] = df.apply(is_swing_voter, axis=1)
+
+    return df
+
+
+def add_swing_voter_column_2020(df, column_labels):
+    """
+    Add a column `vote_changed` to the DataFrame to indicate if there is a difference
+    between `PRE_VotePresident` and `POST_VotePresident`.
+
+    Parameters:
+        df (pd.DataFrame): The input DataFrame.
+        column_labels (dict): A dictionary defining columns and their labels.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the new `vote_changed` column.
+    """
+    # Extract column names from the dictionary
+    pre_vote_col = column_labels["V201033"]["column"]  # "PRE_VotePresident"
+    post_vote_col = "POST_VotePresident"  # Assuming this column exists in the DataFrame
+
+    # Ensure required columns exist in the DataFrame
+    required_columns = [pre_vote_col, post_vote_col]
+    for col in required_columns:
+        if col not in df.columns:
+            raise ValueError(f"Required column '{col}' not found in DataFrame.")
+
+    # Add a new column to indicate if the vote has changed
+    df["swing_voter"] = df[pre_vote_col] != df[post_vote_col]
 
     return df
 

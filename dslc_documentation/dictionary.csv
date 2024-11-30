@@ -53,6 +53,7 @@ V201249,PRE_ScaleDefenseSpending,7,rank
 V201252,PRE_ScaleMedInsurance,7,rank
 V201380,PRE_CorruptionView,3,cat
 V201255,PRE_ScaleJobIncome,7,rank
+V202051,POST_RegistrationStatus,3,cat
 V202068x,POST_Voted2020,3,cat
 V202073,POST_VotePresident,4,cat
 V202219,POST_VoteAccuracy,5,rank
@@ -60,4 +61,6 @@ V202156,POST_ThermoHarris,100,rank
 V202157,POST_ThermoPence,100,rank
 V202143,POST_ThermoBiden,100,rank
 V202144,POST_ThermoTrump,100,rank
+V202123,POST_ReasonNotVoting,15,cat
 V202205y1,POST_ProblemMention,82,cat
+V202644,POST_RespondentHonesty,3,cat
